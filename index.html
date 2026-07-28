@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Termine durchsuchen</title>
+<style>
+  :root {
+    --blue: #2f5fa8;
+    --border: #d7dce3;
+    --bg: #f7f8fa;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --danger: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+  }
+  #app { max-width: 720px; margin: 0 auto; padding: 22px 20px 40px; }
+  h1 { font-size: 17px; margin: 0 0 14px; }
+
+  #search-row { display: flex; gap: 8px; }
+  #search-input {
+    flex: 1; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 14px;
+  }
+  #search-btn {
+    padding: 10px 18px; border: none; border-radius: 6px;
+    background: var(--blue); color: #fff; font-size: 14px; cursor: pointer;
+  }
+  #search-btn:disabled { opacity: 0.6; cursor: default; }
+
+  #hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  #error { color: var(--danger); font-size: 13px; margin-top: 10px; }
+
+  #results { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .result {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .result .name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .result.canceled .name { text-decoration: line-through; color: var(--muted); }
+  .result .meta { font-size: 12.5px; color: var(--muted); }
+  .result .badge {
+    display: inline-block; margin-left: 8px; font-size: 11px;
+    color: var(--danger); border: 1px solid var(--danger); border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  #load-more-row { text-align: center; margin-top: 14px; }
+  #load-more-btn {
+    padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
+    background: #fff; color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  #load-more-btn:disabled { opacity: 0.6; cursor: default; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Termine durchsuchen</h1>
+  <div id="search-row">
+    <input id="search-input" type="text" placeholder="Termin oder Stichwort eingeben …" autocomplete="off">
+    <button id="search-btn">Suchen</button>
+  </div>
+  <div id="hint">Bitte einen Suchbegriff eingeben – durchsucht wird Titel, Ort, Beschreibung und Notiz aller Termine.</div>
+  <div id="error" hidden></div>
+  <div id="results"></div>
+  <div id="load-more-row" hidden>
+    <button id="load-more-btn">Weitere Treffer laden</button>
+  </div>
+</div>
+
+<script>
+  const FUNCTION_URL = "https://cclcdhwnzkzciwjaclzt.supabase.co/functions/v1/search-events";
+
+  const input = document.getElementById("search-input");
+  const btn = document.getElementById("search-btn");
+  const hint = document.getElementById("hint");
+  const errorBox = document.getElementById("error");
+  const resultsBox = document.getElementById("results");
+  const loadMoreRow = document.getElementById("load-more-row");
+  const loadMoreBtn = document.getElementById("load-more-btn");
+
+  let currentQuery = "";
+  let currentPage = 1;
+
+  function formatDateTime(startIso, endIso, allDay) {
+    const start = new Date(startIso);
+    const datePart = start.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    if (allDay) return datePart + " – ganztägig";
+    const timePart = start.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    return `${datePart}, ${timePart} Uhr`;
+  }
+
+  function renderResults(events, append) {
+    if (!append) resultsBox.innerHTML = "";
+    for (const ev of events) {
+      const el = document.createElement("div");
+      el.className = "result" + (ev.canceled ? " canceled" : "");
+      const meta = formatDateTime(ev.start, ev.end, ev.allDay) + (ev.location ? " · " + ev.location : "");
+      el.innerHTML =
+        `<div class="name">${escapeHtml(ev.name)}${ev.canceled ? '<span class="badge">abgesagt</span>' : ""}</div>` +
+        `<div class="meta">${escapeHtml(meta)}</div>`;
+      resultsBox.appendChild(el);
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  async function runSearch(page, append) {
+    errorBox.hidden = true;
+    btn.disabled = true;
+    loadMoreBtn.disabled = true;
+    try {
+      const url = `${FUNCTION_URL}?q=${encodeURIComponent(currentQuery)}&page=${page}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Unbekannter Fehler.");
+
+      renderResults(data.results, append);
+      currentPage = page;
+
+      if (!append && data.results.length === 0) {
+        hint.textContent = "Keine Termine gefunden.";
+        hint.hidden = false;
+      } else {
+        hint.hidden = true;
+      }
+
+      loadMoreRow.hidden = !data.hasMore;
+    } catch (e) {
+      errorBox.textContent = "Fehler bei der Suche: " + e.message;
+      errorBox.hidden = false;
+      if (!append) resultsBox.innerHTML = "";
+      loadMoreRow.hidden = true;
+    } finally {
+      btn.disabled = false;
+      loadMoreBtn.disabled = false;
+    }
+  }
+
+  function startSearch() {
+    const q = input.value.trim();
+    if (!q) {
+      resultsBox.innerHTML = "";
+      loadMoreRow.hidden = true;
+      errorBox.hidden = true;
+      hint.textContent = "Bitte einen Suchbegriff eingeben – durchsucht wird Titel, Ort, Beschreibung und Notiz aller Termine.";
+      hint.hidden = false;
+      return;
+    }
+    currentQuery = q;
+    runSearch(1, false);
+  }
+
+  btn.addEventListener("click", startSearch);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") startSearch(); });
+  loadMoreBtn.addEventListener("click", () => runSearch(currentPage + 1, true));
+</script>
+</body>
+</html>
