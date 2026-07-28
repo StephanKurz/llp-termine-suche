@@ -65,12 +65,19 @@
     font-size: 12px; color: var(--blue); cursor: pointer; user-select: none;
   }
   .participation-toggle:hover { text-decoration: underline; }
+  .participation-toggle.disabled { color: var(--muted); cursor: default; }
+  .participation-toggle.disabled:hover { text-decoration: none; }
   .participation-box {
     margin-top: 6px; font-size: 12.5px; color: var(--text);
     background: var(--bg); border-radius: 6px; padding: 6px 8px;
   }
   .participation-box .total { font-weight: 600; margin-bottom: 2px; }
   .participation-box .breakdown-item { color: var(--muted); }
+  .participation-box .state-heading {
+    font-weight: 600; margin-top: 6px; color: var(--text);
+  }
+  .participation-box .state-heading:first-of-type { margin-top: 2px; }
+  .participation-box .participant-name { color: var(--text); padding-left: 4px; }
 
   #load-more-row { text-align: center; margin-top: 14px; }
   #load-more-btn {
@@ -101,6 +108,7 @@
 <script>
   const SEARCH_URL = "https://cclcdhwnzkzciwjaclzt.supabase.co/functions/v1/search-events";
   const PARTICIPATION_URL = "https://cclcdhwnzkzciwjaclzt.supabase.co/functions/v1/event-participation";
+  const PARTICIPANTS_URL = "https://cclcdhwnzkzciwjaclzt.supabase.co/functions/v1/event-participants";
   const EV_ORG_SLUG = "LLP";
   function eventUrl(id) { return `https://easyverein.com/public/${EV_ORG_SLUG}/calendar/${id}`; }
 
@@ -128,31 +136,61 @@
     return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  async function toggleParticipation(eventId, boxEl, toggleEl) {
-    if (boxEl.dataset.loaded === "1") {
-      boxEl.hidden = !boxEl.hidden;
-      toggleEl.textContent = boxEl.hidden ? "Teilnehmer anzeigen" : "Teilnehmer ausblenden";
-      return;
-    }
-    toggleEl.textContent = "Lädt …";
+  async function loadParticipationCount(eventId, toggleEl) {
     try {
       const resp = await fetch(`${PARTICIPATION_URL}?eventId=${eventId}`);
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Unbekannter Fehler.");
 
+      toggleEl.dataset.total = String(data.total);
       if (data.total === 0) {
-        boxEl.innerHTML = `<span class="breakdown-item">Keine Teilnahmen hinterlegt.</span>`;
+        toggleEl.textContent = "Keine Teilnehmer";
+        toggleEl.classList.add("disabled");
       } else {
-        const items = data.breakdown
-          .map((b) => `<div class="breakdown-item">${b.count}× ${escapeHtml(b.label)}</div>`)
-          .join("");
-        boxEl.innerHTML = `<div class="total">${data.total} Teilnahme(n) insgesamt</div>${items}`;
+        toggleEl.textContent = `${data.total} Teilnehmer anzeigen`;
       }
+    } catch (e) {
+      toggleEl.textContent = "Teilnehmer anzeigen";
+    }
+  }
+
+  function renderParticipantsBox(data) {
+    if (data.total === 0) {
+      return `<span class="breakdown-item">Keine Teilnahmen hinterlegt.</span>`;
+    }
+    let html = `<div class="total">${data.total} Teilnahme(n) insgesamt</div>`;
+    let lastLabel = null;
+    for (const p of data.participants) {
+      if (p.label !== lastLabel) {
+        html += `<div class="state-heading">${escapeHtml(p.label)}</div>`;
+        lastLabel = p.label;
+      }
+      html += `<div class="participant-name">${escapeHtml(p.name || "(ohne Namen hinterlegt)")}</div>`;
+    }
+    return html;
+  }
+
+  async function toggleParticipation(eventId, boxEl, toggleEl) {
+    if (toggleEl.classList.contains("disabled")) return;
+
+    if (boxEl.dataset.loaded === "1") {
+      boxEl.hidden = !boxEl.hidden;
+      toggleEl.textContent = boxEl.hidden ? `${toggleEl.dataset.total} Teilnehmer anzeigen` : "Teilnehmer ausblenden";
+      return;
+    }
+    const savedLabel = toggleEl.textContent;
+    toggleEl.textContent = "Lädt …";
+    try {
+      const resp = await fetch(`${PARTICIPANTS_URL}?eventId=${eventId}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Unbekannter Fehler.");
+
+      boxEl.innerHTML = renderParticipantsBox(data);
       boxEl.dataset.loaded = "1";
       boxEl.hidden = false;
       toggleEl.textContent = "Teilnehmer ausblenden";
     } catch (e) {
-      toggleEl.textContent = "Teilnehmer anzeigen";
+      toggleEl.textContent = savedLabel;
       boxEl.hidden = false;
       boxEl.innerHTML = `<span class="breakdown-item" style="color: var(--danger)">Fehler: ${escapeHtml(e.message)}</span>`;
       boxEl.dataset.loaded = "1";
@@ -168,12 +206,13 @@
       el.innerHTML =
         `<div class="name"><a href="${eventUrl(ev.id)}" target="_blank" rel="noopener">${escapeHtml(ev.name)}</a>${ev.canceled ? '<span class="badge">abgesagt</span>' : ""}</div>` +
         `<div class="meta">${escapeHtml(meta)}</div>` +
-        `<div class="participation-toggle">Teilnehmer anzeigen</div>` +
+        `<div class="participation-toggle">Teilnehmer …</div>` +
         `<div class="participation-box" hidden></div>`;
 
       const toggleEl = el.querySelector(".participation-toggle");
       const boxEl = el.querySelector(".participation-box");
       toggleEl.addEventListener("click", () => toggleParticipation(ev.id, boxEl, toggleEl));
+      loadParticipationCount(ev.id, toggleEl);
 
       resultsBox.appendChild(el);
     }
