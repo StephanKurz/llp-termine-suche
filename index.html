@@ -50,6 +50,8 @@
     padding: 12px 14px;
   }
   .result .name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .result .name a { color: var(--text); text-decoration: none; }
+  .result .name a:hover { color: var(--blue); text-decoration: underline; }
   .result.canceled .name { text-decoration: line-through; color: var(--muted); }
   .result .meta { font-size: 12.5px; color: var(--muted); }
   .result .badge {
@@ -99,6 +101,8 @@
 <script>
   const SEARCH_URL = "https://cclcdhwnzkzciwjaclzt.supabase.co/functions/v1/search-events";
   const PARTICIPATION_URL = "https://cclcdhwnzkzciwjaclzt.supabase.co/functions/v1/event-participation";
+  const EV_ORG_SLUG = "LLP";
+  function eventUrl(id) { return `https://easyverein.com/public/${EV_ORG_SLUG}/calendar/${id}`; }
 
   const input = document.getElementById("search-input");
   const btn = document.getElementById("search-btn");
@@ -162,7 +166,7 @@
       el.className = "result" + (ev.canceled ? " canceled" : "");
       const meta = formatDateTime(ev.start, ev.end, ev.allDay) + (ev.location ? " · " + ev.location : "");
       el.innerHTML =
-        `<div class="name">${escapeHtml(ev.name)}${ev.canceled ? '<span class="badge">abgesagt</span>' : ""}</div>` +
+        `<div class="name"><a href="${eventUrl(ev.id)}" target="_blank" rel="noopener">${escapeHtml(ev.name)}</a>${ev.canceled ? '<span class="badge">abgesagt</span>' : ""}</div>` +
         `<div class="meta">${escapeHtml(meta)}</div>` +
         `<div class="participation-toggle">Teilnehmer anzeigen</div>` +
         `<div class="participation-box" hidden></div>`;
