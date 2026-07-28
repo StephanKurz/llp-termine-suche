@@ -165,7 +165,8 @@
         html += `<div class="state-heading">${escapeHtml(p.label)}</div>`;
         lastLabel = p.label;
       }
-      html += `<div class="participant-name">${escapeHtml(p.name || "(ohne Namen hinterlegt)")}</div>`;
+      const displayName = (p.name || "(ohne Namen hinterlegt)") + (p.comment ? ` (${p.comment})` : "");
+      html += `<div class="participant-name">${escapeHtml(displayName)}</div>`;
     }
     return html;
   }
