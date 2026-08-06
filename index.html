@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Termine durchsuchen</title>
+<title>Termin Suche in allen Kalendern</title>
 <style>
   :root {
     --blue: #2f5fa8;
@@ -49,10 +49,19 @@
     background: #fff; border: 1px solid var(--border); border-radius: 8px;
     padding: 12px 14px;
   }
-  .result .name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .result .name-row {
+    display: flex; align-items: baseline; gap: 10px;
+    margin-bottom: 4px;
+  }
+  .result .name { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 600; }
   .result .name a { color: var(--text); text-decoration: none; }
   .result .name a:hover { color: var(--blue); text-decoration: underline; }
   .result.canceled .name { text-decoration: line-through; color: var(--muted); }
+  .result .calendar-name {
+    flex: 0 0 auto; max-width: 40%; text-align: right;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
   .result .meta { font-size: 12.5px; color: var(--muted); }
   .result .badge {
     display: inline-block; margin-left: 8px; font-size: 11px;
@@ -89,7 +98,7 @@
 </head>
 <body>
 <div id="app">
-  <h1>Termine durchsuchen</h1>
+  <h1>Termin Suche in allen Kalendern</h1>
   <div id="search-row">
     <input id="search-input" type="text" placeholder="Termin oder Stichwort eingeben …" autocomplete="off">
     <button id="search-btn">Suchen</button>
@@ -204,8 +213,14 @@
       const el = document.createElement("div");
       el.className = "result" + (ev.canceled ? " canceled" : "");
       const meta = formatDateTime(ev.start, ev.end, ev.allDay) + (ev.location ? " · " + ev.location : "");
+      const calendarBadge = ev.calendarName
+        ? `<div class="calendar-name" style="color: ${escapeHtml(ev.calendarColor || "var(--muted)")}" title="${escapeHtml(ev.calendarName)}">${escapeHtml(ev.calendarName)}</div>`
+        : "";
       el.innerHTML =
-        `<div class="name"><a href="${eventUrl(ev.id)}" target="_blank" rel="noopener">${escapeHtml(ev.name)}</a>${ev.canceled ? '<span class="badge">abgesagt</span>' : ""}</div>` +
+        `<div class="name-row">` +
+          `<div class="name"><a href="${eventUrl(ev.id)}" target="_blank" rel="noopener">${escapeHtml(ev.name)}</a>${ev.canceled ? '<span class="badge">abgesagt</span>' : ""}</div>` +
+          calendarBadge +
+        `</div>` +
         `<div class="meta">${escapeHtml(meta)}</div>` +
         `<div class="participation-toggle">Teilnehmer …</div>` +
         `<div class="participation-box" hidden></div>`;
