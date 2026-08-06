@@ -100,13 +100,13 @@
 <div id="app">
   <h1>Termin Suche in allen Kalendern</h1>
   <div id="search-row">
-    <input id="search-input" type="text" placeholder="Termin oder Stichwort eingeben …" autocomplete="off">
+    <input id="search-input" type="text" placeholder="Termin oder Stichwort eingeben … (oder * für alle Termine)" autocomplete="off">
     <button id="search-btn">Suchen</button>
   </div>
   <div id="options-row">
     <label><input type="checkbox" id="future-checkbox"> Auch künftige Termine anzeigen</label>
   </div>
-  <div id="hint">Bitte einen Suchbegriff eingeben – durchsucht wird Titel, Ort, Beschreibung und Notiz aller Termine.</div>
+  <div id="hint">Bitte einen Suchbegriff eingeben – durchsucht wird Titel, Ort, Beschreibung und Notiz aller Termine. Mit * werden alle Termine angezeigt.</div>
   <div id="error" hidden></div>
   <div id="results"></div>
   <div id="load-more-row" hidden>
@@ -273,7 +273,7 @@
       resultsBox.innerHTML = "";
       loadMoreRow.hidden = true;
       errorBox.hidden = true;
-      hint.textContent = "Bitte einen Suchbegriff eingeben – durchsucht wird Titel, Ort, Beschreibung und Notiz aller Termine.";
+      hint.textContent = "Bitte einen Suchbegriff eingeben – durchsucht wird Titel, Ort, Beschreibung und Notiz aller Termine. Mit * werden alle Termine angezeigt.";
       hint.hidden = false;
       return;
     }
